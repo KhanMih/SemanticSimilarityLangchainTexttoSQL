@@ -1,0 +1,598 @@
+{
+  "ragas_evaluation": true,
+  "elapsed_seconds": 489.1,
+  "summary": {
+    "baseline_accuracy": 0.8,
+    "with_learning_accuracy": 0.8,
+    "improvement_pct_points": 0.0,
+    "total_questions": 30
+  },
+  "baseline": {
+    "phase": "zero_shot_baseline",
+    "accuracy": 0.8,
+    "valid_sql_rate": 1.0,
+    "by_difficulty": {
+      "challenging": {
+        "count": 10,
+        "correct": 6,
+        "accuracy": 0.6
+      },
+      "moderate": {
+        "count": 10,
+        "correct": 8,
+        "accuracy": 0.8
+      },
+      "simple": {
+        "count": 10,
+        "correct": 10,
+        "accuracy": 1.0
+      }
+    },
+    "details": [
+      {
+        "question_id": 0,
+        "question": "How many customers are registered in the system?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS customer_count FROM customers;",
+        "predicted_sql": "SELECT\n  COUNT(c.customer_id) AS total_customers\nFROM customers AS c;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 1,
+        "question": "What is the total number of products available?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS product_count FROM products;",
+        "predicted_sql": "SELECT\n  COUNT(p.product_id)\nFROM products AS p\nWHERE\n  p.is_active = TRUE;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 2,
+        "question": "How many orders have been placed in total?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS order_count FROM orders;",
+        "predicted_sql": "SELECT\n  COUNT(o.order_id) AS total_orders\nFROM orders AS o;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 3,
+        "question": "List all unique product categories",
+        "difficulty": "simple",
+        "gold_sql": "SELECT DISTINCT category FROM products ORDER BY category;",
+        "predicted_sql": "SELECT DISTINCT\n  p.category\nFROM products AS p\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (2 rows)"
+      },
+      {
+        "question_id": 4,
+        "question": "What is the most expensive product?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT name, price FROM products ORDER BY price DESC LIMIT 1;",
+        "predicted_sql": "SELECT\n  p.name,\n  p.price\nFROM products AS p\nORDER BY\n  p.price DESC\nLIMIT 1;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 5,
+        "question": "Show all customers from the UK",
+        "difficulty": "simple",
+        "gold_sql": "SELECT name, email, city FROM customers WHERE country = 'UK' ORDER BY name;",
+        "predicted_sql": "SELECT\n  customer_id,\n  name,\n  email,\n  city,\n  country,\n  segment,\n  created_at\nFROM\n  customers\nWHERE\n  country = 'UK'\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (2 rows)"
+      },
+      {
+        "question_id": 6,
+        "question": "How many products are in the Furniture category?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS furniture_count FROM products WHERE category = 'Furniture';",
+        "predicted_sql": "SELECT\n  count(p.product_id)\nFROM products AS p\nWHERE\n  p.category = 'Furniture';",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 7,
+        "question": "What is the total discount given across all orders?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT SUM(discount) AS total_discount FROM orders;",
+        "predicted_sql": "SELECT\n  SUM(o.discount) AS total_discount\nFROM orders AS o;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 8,
+        "question": "How many orders have been delivered?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS delivered_count FROM orders WHERE status = 'delivered';",
+        "predicted_sql": "SELECT\n  COUNT(o.order_id)\nFROM orders AS o\nWHERE\n  o.status = 'delivered';",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 9,
+        "question": "List products priced under 50 dollars",
+        "difficulty": "simple",
+        "gold_sql": "SELECT name, category, price FROM products WHERE price < 50 ORDER BY price;",
+        "predicted_sql": "SELECT\n  p.product_id,\n  p.name,\n  p.category,\n  p.price\nFROM\n  products AS p\nWHERE\n  p.price < 50\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (8 rows)"
+      },
+      {
+        "question_id": 10,
+        "question": "What is the total revenue from non-cancelled orders?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT SUM(total_amount) AS total_revenue FROM orders WHERE status != 'cancelled';",
+        "predicted_sql": "SELECT\n  SUM(o.total_amount) AS total_revenue\nFROM orders AS o\nWHERE\n  o.status <> 'cancelled';",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 11,
+        "question": "What is the average order value excluding cancelled orders?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT ROUND(AVG(total_amount)::numeric, 2) AS avg_order_value FROM orders WHERE status != 'cancelled';",
+        "predicted_sql": "SELECT\n  AVG(o.total_amount) AS average_order_value\nFROM orders AS o\nWHERE\n  o.status <> 'cancelled';",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 1 rows, pred 1 rows"
+      },
+      {
+        "question_id": 12,
+        "question": "What is the average product price by category?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT category, ROUND(AVG(price)::numeric, 2) AS avg_price FROM products GROUP BY category ORDER BY avg_price DESC;",
+        "predicted_sql": "SELECT\n  p.category,\n  AVG(p.price) AS average_price\nFROM products AS p\nGROUP BY\n  p.category\nORDER BY\n  p.category\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 2 rows, pred 2 rows"
+      },
+      {
+        "question_id": 13,
+        "question": "How many orders did each customer place?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT c.name, COUNT(o.order_id) AS order_count FROM customers c LEFT JOIN orders o ON o.customer_id = c.customer_id GROUP BY c.customer_id, c.name ORDER BY order_count DESC;",
+        "predicted_sql": "SELECT\n  c.name,\n  COUNT(o.order_id) AS order_count\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nGROUP BY\n  c.customer_id,\n  c.name\nORDER BY\n  order_count DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (10 rows)"
+      },
+      {
+        "question_id": 14,
+        "question": "Show the total quantity sold for each product",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.name, SUM(oi.quantity) AS total_sold FROM products p JOIN order_items oi ON oi.product_id = p.product_id GROUP BY p.product_id, p.name ORDER BY total_sold DESC;",
+        "predicted_sql": "SELECT\n  p.name,\n  SUM(oi.quantity) AS total_quantity_sold\nFROM order_items AS oi\nJOIN products AS p\n  ON oi.product_id = p.product_id\nGROUP BY\n  p.product_id,\n  p.name\nORDER BY\n  total_quantity_sold DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (8 rows)"
+      },
+      {
+        "question_id": 15,
+        "question": "What is the average review rating for each product?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.name, ROUND(AVG(r.rating)::numeric, 2) AS avg_rating, COUNT(r.review_id) AS review_count FROM products p JOIN reviews r ON r.product_id = p.product_id GROUP BY p.product_id, p.name ORDER BY avg_rating DESC;",
+        "predicted_sql": "SELECT\n  p.name,\n  AVG(r.rating) AS average_rating\nFROM products AS p\nJOIN reviews AS r\n  ON p.product_id = r.product_id\nGROUP BY\n  p.product_id,\n  p.name\nORDER BY\n  average_rating DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (6 rows)"
+      },
+      {
+        "question_id": 16,
+        "question": "Show the revenue by product category from non-cancelled orders",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.category, SUM(oi.quantity * oi.unit_price) AS revenue FROM order_items oi JOIN products p ON p.product_id = oi.product_id JOIN orders o ON o.order_id = oi.order_id WHERE o.status != 'cancelled' GROUP BY p.category ORDER BY revenue DESC;",
+        "predicted_sql": "SELECT\n  p.category,\n  SUM(oi.line_total) AS total_revenue\nFROM order_items AS oi\nJOIN orders AS o\n  ON oi.order_id = o.order_id\nJOIN products AS p\n  ON oi.product_id = p.product_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  p.category\nORDER BY\n  total_revenue DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (2 rows)"
+      },
+      {
+        "question_id": 17,
+        "question": "Which products have more than one review?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.name, COUNT(r.review_id) AS review_count FROM products p JOIN reviews r ON r.product_id = p.product_id GROUP BY p.product_id, p.name HAVING COUNT(r.review_id) > 1 ORDER BY review_count DESC;",
+        "predicted_sql": "WITH ProductReviewCounts AS (\n  SELECT\n    r.product_id,\n    COUNT(r.review_id) AS review_count\n  FROM reviews AS r\n  GROUP BY\n    r.product_id\n)\nSELECT\n  p.name\nFROM products AS p\nJOIN ProductReviewCounts AS prc\n  ON p.product_id = prc.product_id\nWHERE\n  prc.review_count > 1\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (6 rows)"
+      },
+      {
+        "question_id": 18,
+        "question": "Show orders placed in February 2025",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT order_id, customer_id, order_date, status, total_amount FROM orders WHERE order_date >= '2025-02-01' AND order_date < '2025-03-01' ORDER BY order_date;",
+        "predicted_sql": "SELECT\n  o.order_id,\n  o.customer_id,\n  o.order_date,\n  o.status,\n  o.total_amount,\n  o.discount,\n  o.shipping_cost\nFROM\n  orders AS o\nWHERE\n  o.order_date >= '2025-02-01' AND o.order_date < '2025-03-01'\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (6 rows)"
+      },
+      {
+        "question_id": 19,
+        "question": "What is the total revenue by customer country excluding cancelled orders?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT c.country, SUM(o.total_amount) AS revenue FROM customers c JOIN orders o ON o.customer_id = c.customer_id WHERE o.status != 'cancelled' GROUP BY c.country ORDER BY revenue DESC;",
+        "predicted_sql": "SELECT\n  c.country,\n  SUM(o.total_amount) AS total_revenue\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  c.country\nORDER BY\n  total_revenue DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (4 rows)"
+      },
+      {
+        "question_id": 20,
+        "question": "Which customers have never placed an order?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.name, c.email FROM customers c LEFT JOIN orders o ON o.customer_id = c.customer_id WHERE o.order_id IS NULL ORDER BY c.name;",
+        "predicted_sql": "SELECT\n  c.customer_id,\n  c.name,\n  c.email\nFROM customers AS c\nLEFT JOIN orders AS o\n  ON c.customer_id = o.customer_id\nWHERE\n  o.order_id IS NULL\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (0 rows)"
+      },
+      {
+        "question_id": 21,
+        "question": "Which products have never been ordered?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT p.name, p.category FROM products p LEFT JOIN order_items oi ON oi.product_id = p.product_id WHERE oi.item_id IS NULL ORDER BY p.name;",
+        "predicted_sql": "SELECT\n  p.product_id,\n  p.name,\n  p.category\nFROM products AS p\nLEFT JOIN order_items AS oi\n  ON p.product_id = oi.product_id\nWHERE\n  oi.order_id IS NULL\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (12 rows)"
+      },
+      {
+        "question_id": 22,
+        "question": "Which products have no reviews?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT p.name, p.category FROM products p LEFT JOIN reviews r ON r.product_id = p.product_id WHERE r.review_id IS NULL ORDER BY p.name;",
+        "predicted_sql": "SELECT\n  p.product_id,\n  p.name\nFROM\n  products AS p\nLEFT JOIN\n  reviews AS r\n  ON p.product_id = r.product_id\nWHERE\n  r.review_id IS NULL\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 14 rows, pred 14 rows"
+      },
+      {
+        "question_id": 23,
+        "question": "Show monthly order count and revenue for 2025 excluding cancelled and returned orders",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT DATE_TRUNC('month', o.order_date) AS month, COUNT(*) AS order_count, SUM(o.total_amount) AS revenue FROM orders o WHERE o.status NOT IN ('cancelled', 'returned') AND o.order_date >= '2025-01-01' AND o.order_date < '2026-01-01' GROUP BY month ORDER BY month;",
+        "predicted_sql": "SELECT\n  TO_CHAR(o.order_date, 'YYYY-MM') AS order_month,\n  COUNT(o.order_id) AS order_count,\n  SUM(o.total_amount) AS total_revenue\nFROM orders AS o\nWHERE\n  EXTRACT(YEAR FROM o.order_date) = 2025\n  AND o.status NOT IN ('cancelled', 'returned')\nGROUP BY\n  order_month\nORDER BY\n  order_month\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 4 rows, pred 4 rows"
+      },
+      {
+        "question_id": 24,
+        "question": "What is the profit margin percentage for each product?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT name, category, price, cost, ROUND(((price - cost) / price * 100)::numeric, 1) AS margin_pct FROM products WHERE cost IS NOT NULL AND cost > 0 ORDER BY margin_pct DESC;",
+        "predicted_sql": "SELECT\n  p.product_id,\n  p.name,\n  ((p.price - p.cost) / NULLIF(p.price, 0)) * 100 AS profit_margin_percentage\nFROM\n  products AS p\nORDER BY\n  profit_margin_percentage DESC NULLS LAST\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 20 rows, pred 20 rows"
+      },
+      {
+        "question_id": 25,
+        "question": "Who are the top 3 customers by total spending excluding cancelled orders?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.name, SUM(o.total_amount) AS total_spent FROM customers c JOIN orders o ON o.customer_id = c.customer_id WHERE o.status != 'cancelled' GROUP BY c.customer_id, c.name ORDER BY total_spent DESC LIMIT 3;",
+        "predicted_sql": "SELECT\n  c.name,\n  SUM(o.total_amount) AS total_spending\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  c.customer_id,\n  c.name\nORDER BY\n  total_spending DESC\nLIMIT 3;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (3 rows)"
+      },
+      {
+        "question_id": 26,
+        "question": "Show the top 5 products by total revenue from non-cancelled orders",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT p.name, SUM(oi.quantity * oi.unit_price) AS revenue FROM order_items oi JOIN products p ON p.product_id = oi.product_id JOIN orders o ON o.order_id = oi.order_id WHERE o.status != 'cancelled' GROUP BY p.product_id, p.name ORDER BY revenue DESC LIMIT 5;",
+        "predicted_sql": "WITH ProductRevenue AS (\n  SELECT\n    oi.product_id,\n    oi.line_total\n  FROM order_items AS oi\n  JOIN orders AS o\n    ON oi.order_id = o.order_id\n  WHERE\n    o.status <> 'cancelled'\n)\nSELECT\n  p.name,\n  SUM(pr.line_total) AS total_revenue\nFROM ProductRevenue AS pr\nJOIN products AS p\n  ON pr.product_id = p.product_id\nGROUP BY\n  p.product_id,\n  p.name\nORDER BY\n  total_revenue DESC\nLIMIT 5;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (5 rows)"
+      },
+      {
+        "question_id": 27,
+        "question": "What is the average order value by customer segment excluding cancelled orders?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.segment, ROUND(AVG(o.total_amount)::numeric, 2) AS avg_order_value, COUNT(o.order_id) AS order_count FROM customers c JOIN orders o ON o.customer_id = c.customer_id WHERE o.status != 'cancelled' GROUP BY c.segment ORDER BY avg_order_value DESC;",
+        "predicted_sql": "SELECT\n  c.segment,\n  AVG(o.total_amount) AS average_order_value\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  c.segment\nORDER BY\n  average_order_value DESC\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 3 rows, pred 3 rows"
+      },
+      {
+        "question_id": 28,
+        "question": "Show customers who placed more than one order",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.name, c.email, COUNT(o.order_id) AS order_count FROM customers c JOIN orders o ON o.customer_id = c.customer_id GROUP BY c.customer_id, c.name, c.email HAVING COUNT(o.order_id) > 1 ORDER BY order_count DESC;",
+        "predicted_sql": "WITH customer_order_counts AS (\n  SELECT\n    o.customer_id,\n    COUNT(o.order_id) AS number_of_orders\n  FROM orders AS o\n  GROUP BY\n    o.customer_id\n)\nSELECT\n  c.name,\n  coc.number_of_orders\nFROM customers AS c\nJOIN customer_order_counts AS coc\n  ON c.customer_id = coc.customer_id\nWHERE\n  coc.number_of_orders > 1\nORDER BY\n  coc.number_of_orders DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (10 rows)"
+      },
+      {
+        "question_id": 29,
+        "question": "What is the total shipping cost by customer country?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.country, SUM(o.shipping_cost) AS total_shipping FROM customers c JOIN orders o ON o.customer_id = c.customer_id GROUP BY c.country ORDER BY total_shipping DESC;",
+        "predicted_sql": "SELECT\n  c.country,\n  SUM(o.shipping_cost) AS total_shipping_cost\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nGROUP BY\n  c.country\nORDER BY\n  total_shipping_cost DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (5 rows)"
+      }
+    ]
+  },
+  "with_learning": {
+    "phase": "dynamic_few_shot_learned",
+    "accuracy": 0.8,
+    "valid_sql_rate": 1.0,
+    "by_difficulty": {
+      "challenging": {
+        "count": 10,
+        "correct": 9,
+        "accuracy": 0.9
+      },
+      "moderate": {
+        "count": 10,
+        "correct": 6,
+        "accuracy": 0.6
+      },
+      "simple": {
+        "count": 10,
+        "correct": 9,
+        "accuracy": 0.9
+      }
+    },
+    "details": [
+      {
+        "question_id": 0,
+        "question": "How many customers are registered in the system?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS customer_count FROM customers;",
+        "predicted_sql": "SELECT COUNT(c.customer_id) AS number_of_customers\nFROM customers AS c;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 1,
+        "question": "What is the total number of products available?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS product_count FROM products;",
+        "predicted_sql": "SELECT\n  COUNT(p.product_id) AS total_available_products\nFROM products AS p\nWHERE\n  p.is_active = TRUE;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 2,
+        "question": "How many orders have been placed in total?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS order_count FROM orders;",
+        "predicted_sql": "SELECT COUNT(order_id) AS total_orders\nFROM orders;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 3,
+        "question": "List all unique product categories",
+        "difficulty": "simple",
+        "gold_sql": "SELECT DISTINCT category FROM products ORDER BY category;",
+        "predicted_sql": "SELECT DISTINCT\n  category\nFROM products\nORDER BY\n  category\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (2 rows)"
+      },
+      {
+        "question_id": 4,
+        "question": "What is the most expensive product?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT name, price FROM products ORDER BY price DESC LIMIT 1;",
+        "predicted_sql": "SELECT\n  p.name,\n  p.price\nFROM\n  products AS p\nORDER BY\n  p.price DESC\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 1 rows, pred 20 rows"
+      },
+      {
+        "question_id": 5,
+        "question": "Show all customers from the UK",
+        "difficulty": "simple",
+        "gold_sql": "SELECT name, email, city FROM customers WHERE country = 'UK' ORDER BY name;",
+        "predicted_sql": "SELECT\n  c.customer_id,\n  c.name,\n  c.email,\n  c.city,\n  c.country,\n  c.segment\nFROM\n  customers AS c\nWHERE\n  c.country = 'UK'\nORDER BY\n  c.name\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (2 rows)"
+      },
+      {
+        "question_id": 6,
+        "question": "How many products are in the Furniture category?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS furniture_count FROM products WHERE category = 'Furniture';",
+        "predicted_sql": "SELECT COUNT(p.product_id) AS furniture_product_count\nFROM products AS p\nWHERE p.category = 'Furniture';",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 7,
+        "question": "What is the total discount given across all orders?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT SUM(discount) AS total_discount FROM orders;",
+        "predicted_sql": "SELECT SUM(discount) AS total_discount\nFROM orders;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 8,
+        "question": "How many orders have been delivered?",
+        "difficulty": "simple",
+        "gold_sql": "SELECT COUNT(*) AS delivered_count FROM orders WHERE status = 'delivered';",
+        "predicted_sql": "SELECT COUNT(o.order_id) AS delivered_orders_count\nFROM orders AS o\nWHERE o.status = 'delivered';",
+        "execution_accuracy": "correct",
+        "reason": "Results match (1 rows)"
+      },
+      {
+        "question_id": 9,
+        "question": "List products priced under 50 dollars",
+        "difficulty": "simple",
+        "gold_sql": "SELECT name, category, price FROM products WHERE price < 50 ORDER BY price;",
+        "predicted_sql": "SELECT\n  p.product_id,\n  p.name,\n  p.category,\n  p.price\nFROM products AS p\nWHERE\n  p.price < 50\nORDER BY\n  p.price\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (8 rows)"
+      },
+      {
+        "question_id": 10,
+        "question": "What is the total revenue from non-cancelled orders?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT SUM(total_amount) AS total_revenue FROM orders WHERE status != 'cancelled';",
+        "predicted_sql": "SELECT SUM(oi.quantity * oi.unit_price) AS total_revenue\nFROM order_items AS oi\nJOIN orders AS o\n  ON oi.order_id = o.order_id\nWHERE o.status != 'cancelled';",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 1 rows, pred 1 rows"
+      },
+      {
+        "question_id": 11,
+        "question": "What is the average order value excluding cancelled orders?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT ROUND(AVG(total_amount)::numeric, 2) AS avg_order_value FROM orders WHERE status != 'cancelled';",
+        "predicted_sql": "SELECT AVG(o.total_amount) AS average_order_value\nFROM orders AS o\nWHERE o.status <> 'cancelled';",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 1 rows, pred 1 rows"
+      },
+      {
+        "question_id": 12,
+        "question": "What is the average product price by category?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT category, ROUND(AVG(price)::numeric, 2) AS avg_price FROM products GROUP BY category ORDER BY avg_price DESC;",
+        "predicted_sql": "SELECT\n  p.category,\n  ROUND(AVG(p.price), 2) AS average_price\nFROM products AS p\nGROUP BY\n  p.category\nORDER BY\n  average_price DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (2 rows)"
+      },
+      {
+        "question_id": 13,
+        "question": "How many orders did each customer place?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT c.name, COUNT(o.order_id) AS order_count FROM customers c LEFT JOIN orders o ON o.customer_id = c.customer_id GROUP BY c.customer_id, c.name ORDER BY order_count DESC;",
+        "predicted_sql": "SELECT\n  c.name,\n  c.email,\n  COUNT(o.order_id) AS order_count\nFROM customers AS c\nLEFT JOIN orders AS o\n  ON c.customer_id = o.customer_id\nGROUP BY\n  c.customer_id,\n  c.name,\n  c.email\nORDER BY\n  order_count DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (10 rows)"
+      },
+      {
+        "question_id": 14,
+        "question": "Show the total quantity sold for each product",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.name, SUM(oi.quantity) AS total_sold FROM products p JOIN order_items oi ON oi.product_id = p.product_id GROUP BY p.product_id, p.name ORDER BY total_sold DESC;",
+        "predicted_sql": "SELECT\n  p.name,\n  SUM(oi.quantity) AS total_quantity_sold\nFROM order_items AS oi\nJOIN products AS p\n  ON oi.product_id = p.product_id\nJOIN orders AS o\n  ON oi.order_id = o.order_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  p.product_id,\n  p.name\nORDER BY\n  total_quantity_sold DESC\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 8 rows, pred 8 rows"
+      },
+      {
+        "question_id": 15,
+        "question": "What is the average review rating for each product?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.name, ROUND(AVG(r.rating)::numeric, 2) AS avg_rating, COUNT(r.review_id) AS review_count FROM products p JOIN reviews r ON r.product_id = p.product_id GROUP BY p.product_id, p.name ORDER BY avg_rating DESC;",
+        "predicted_sql": "SELECT p.name,\n       ROUND(AVG(r.rating)::numeric, 2) AS average_rating\nFROM products AS p\nJOIN reviews AS r\n  ON p.product_id = r.product_id\nGROUP BY p.product_id,\n         p.name\nORDER BY average_rating DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (6 rows)"
+      },
+      {
+        "question_id": 16,
+        "question": "Show the revenue by product category from non-cancelled orders",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.category, SUM(oi.quantity * oi.unit_price) AS revenue FROM order_items oi JOIN products p ON p.product_id = oi.product_id JOIN orders o ON o.order_id = oi.order_id WHERE o.status != 'cancelled' GROUP BY p.category ORDER BY revenue DESC;",
+        "predicted_sql": "SELECT\n  p.category,\n  SUM(oi.quantity * oi.unit_price) AS revenue\nFROM order_items AS oi\nJOIN orders AS o\n  ON oi.order_id = o.order_id\nJOIN products AS p\n  ON oi.product_id = p.product_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  p.category\nORDER BY\n  revenue DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (2 rows)"
+      },
+      {
+        "question_id": 17,
+        "question": "Which products have more than one review?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT p.name, COUNT(r.review_id) AS review_count FROM products p JOIN reviews r ON r.product_id = p.product_id GROUP BY p.product_id, p.name HAVING COUNT(r.review_id) > 1 ORDER BY review_count DESC;",
+        "predicted_sql": "SELECT p.name,\n       COUNT(r.review_id) AS review_count\nFROM products AS p\nJOIN reviews AS r\n  ON p.product_id = r.product_id\nGROUP BY p.product_id,\n         p.name\nHAVING COUNT(r.review_id) > 1\nORDER BY review_count DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (6 rows)"
+      },
+      {
+        "question_id": 18,
+        "question": "Show orders placed in February 2025",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT order_id, customer_id, order_date, status, total_amount FROM orders WHERE order_date >= '2025-02-01' AND order_date < '2025-03-01' ORDER BY order_date;",
+        "predicted_sql": "SELECT\n  o.order_id,\n  o.customer_id,\n  o.order_date,\n  o.status,\n  o.total_amount\nFROM\n  orders AS o\nWHERE\n  o.order_date >= '2025-02-01' AND o.order_date < '2025-03-01'\nORDER BY\n  o.order_date\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (6 rows)"
+      },
+      {
+        "question_id": 19,
+        "question": "What is the total revenue by customer country excluding cancelled orders?",
+        "difficulty": "moderate",
+        "gold_sql": "SELECT c.country, SUM(o.total_amount) AS revenue FROM customers c JOIN orders o ON o.customer_id = c.customer_id WHERE o.status != 'cancelled' GROUP BY c.country ORDER BY revenue DESC;",
+        "predicted_sql": "SELECT\n  c.country,\n  SUM(oi.quantity * oi.unit_price) AS total_revenue\nFROM order_items AS oi\nJOIN orders AS o\n  ON oi.order_id = o.order_id\nJOIN customers AS c\n  ON o.customer_id = c.customer_id\nWHERE\n  o.status != 'cancelled'\nGROUP BY\n  c.country\nORDER BY\n  total_revenue DESC\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 4 rows, pred 4 rows"
+      },
+      {
+        "question_id": 20,
+        "question": "Which customers have never placed an order?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.name, c.email FROM customers c LEFT JOIN orders o ON o.customer_id = c.customer_id WHERE o.order_id IS NULL ORDER BY c.name;",
+        "predicted_sql": "SELECT\n  c.customer_id,\n  c.name,\n  c.email,\n  c.city,\n  c.segment\nFROM customers AS c\nLEFT JOIN orders AS o\n  ON c.customer_id = o.customer_id\nWHERE\n  o.order_id IS NULL\nORDER BY\n  c.name\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (0 rows)"
+      },
+      {
+        "question_id": 21,
+        "question": "Which products have never been ordered?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT p.name, p.category FROM products p LEFT JOIN order_items oi ON oi.product_id = p.product_id WHERE oi.item_id IS NULL ORDER BY p.name;",
+        "predicted_sql": "SELECT\n  p.product_id,\n  p.name,\n  p.category,\n  p.price\nFROM products AS p\nLEFT JOIN order_items AS oi\n  ON p.product_id = oi.product_id\nWHERE\n  oi.item_id IS NULL\nORDER BY\n  p.name\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (12 rows)"
+      },
+      {
+        "question_id": 22,
+        "question": "Which products have no reviews?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT p.name, p.category FROM products p LEFT JOIN reviews r ON r.product_id = p.product_id WHERE r.review_id IS NULL ORDER BY p.name;",
+        "predicted_sql": "SELECT\n  p.product_id,\n  p.name,\n  p.category,\n  p.price\nFROM products AS p\nLEFT JOIN reviews AS r\n  ON p.product_id = r.product_id\nWHERE\n  r.review_id IS NULL\nORDER BY\n  p.name\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (14 rows)"
+      },
+      {
+        "question_id": 23,
+        "question": "Show monthly order count and revenue for 2025 excluding cancelled and returned orders",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT DATE_TRUNC('month', o.order_date) AS month, COUNT(*) AS order_count, SUM(o.total_amount) AS revenue FROM orders o WHERE o.status NOT IN ('cancelled', 'returned') AND o.order_date >= '2025-01-01' AND o.order_date < '2026-01-01' GROUP BY month ORDER BY month;",
+        "predicted_sql": "SELECT\n  DATE_TRUNC('month', o.order_date) AS month,\n  COUNT(o.order_id) AS order_count,\n  SUM(o.total_amount) AS revenue\nFROM orders AS o\nWHERE\n  o.order_date >= '2025-01-01' AND o.order_date < '2026-01-01'\n  AND o.status NOT IN ('cancelled', 'returned')\nGROUP BY\n  month\nORDER BY\n  month\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (4 rows)"
+      },
+      {
+        "question_id": 24,
+        "question": "What is the profit margin percentage for each product?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT name, category, price, cost, ROUND(((price - cost) / price * 100)::numeric, 1) AS margin_pct FROM products WHERE cost IS NOT NULL AND cost > 0 ORDER BY margin_pct DESC;",
+        "predicted_sql": "SELECT\n  p.name,\n  p.category,\n  p.price,\n  p.cost,\n  ROUND(((p.price - p.cost) / p.price) * 100, 2) AS margin_percentage\nFROM products AS p\nWHERE\n  p.price IS NOT NULL AND p.price > 0 AND p.cost IS NOT NULL\nORDER BY\n  margin_percentage DESC\nLIMIT 100;",
+        "execution_accuracy": "incorrect",
+        "reason": "Results differ: gold 20 rows, pred 20 rows"
+      },
+      {
+        "question_id": 25,
+        "question": "Who are the top 3 customers by total spending excluding cancelled orders?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.name, SUM(o.total_amount) AS total_spent FROM customers c JOIN orders o ON o.customer_id = c.customer_id WHERE o.status != 'cancelled' GROUP BY c.customer_id, c.name ORDER BY total_spent DESC LIMIT 3;",
+        "predicted_sql": "SELECT\n  c.customer_id,\n  c.name,\n  SUM(o.total_amount) AS total_spending\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  c.customer_id,\n  c.name\nORDER BY\n  total_spending DESC\nLIMIT 3;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (3 rows)"
+      },
+      {
+        "question_id": 26,
+        "question": "Show the top 5 products by total revenue from non-cancelled orders",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT p.name, SUM(oi.quantity * oi.unit_price) AS revenue FROM order_items oi JOIN products p ON p.product_id = oi.product_id JOIN orders o ON o.order_id = oi.order_id WHERE o.status != 'cancelled' GROUP BY p.product_id, p.name ORDER BY revenue DESC LIMIT 5;",
+        "predicted_sql": "SELECT p.name,\n       SUM(oi.quantity * oi.unit_price) AS total_revenue\nFROM order_items AS oi\nJOIN products AS p ON oi.product_id = p.product_id\nJOIN orders AS o ON oi.order_id = o.order_id\nWHERE o.status != 'cancelled'\nGROUP BY p.product_id,\n         p.name\nORDER BY total_revenue DESC\nLIMIT 5;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (5 rows)"
+      },
+      {
+        "question_id": 27,
+        "question": "What is the average order value by customer segment excluding cancelled orders?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.segment, ROUND(AVG(o.total_amount)::numeric, 2) AS avg_order_value, COUNT(o.order_id) AS order_count FROM customers c JOIN orders o ON o.customer_id = c.customer_id WHERE o.status != 'cancelled' GROUP BY c.segment ORDER BY avg_order_value DESC;",
+        "predicted_sql": "SELECT\n  c.segment,\n  ROUND(AVG(o.total_amount)::numeric, 2) AS avg_order_value\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nWHERE\n  o.status <> 'cancelled'\nGROUP BY\n  c.segment\nORDER BY\n  avg_order_value DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (3 rows)"
+      },
+      {
+        "question_id": 28,
+        "question": "Show customers who placed more than one order",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.name, c.email, COUNT(o.order_id) AS order_count FROM customers c JOIN orders o ON o.customer_id = c.customer_id GROUP BY c.customer_id, c.name, c.email HAVING COUNT(o.order_id) > 1 ORDER BY order_count DESC;",
+        "predicted_sql": "SELECT\n  c.name,\n  c.email,\n  COUNT(o.order_id) AS number_of_orders\nFROM customers AS c\nJOIN orders AS o\n  ON c.customer_id = o.customer_id\nGROUP BY\n  c.customer_id,\n  c.name,\n  c.email\nHAVING\n  COUNT(o.order_id) > 1\nORDER BY\n  number_of_orders DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (10 rows)"
+      },
+      {
+        "question_id": 29,
+        "question": "What is the total shipping cost by customer country?",
+        "difficulty": "challenging",
+        "gold_sql": "SELECT c.country, SUM(o.shipping_cost) AS total_shipping FROM customers c JOIN orders o ON o.customer_id = c.customer_id GROUP BY c.country ORDER BY total_shipping DESC;",
+        "predicted_sql": "SELECT\n  c.country,\n  SUM(o.shipping_cost) AS total_shipping_cost\nFROM orders AS o\nJOIN customers AS c\n  ON o.customer_id = c.customer_id\nGROUP BY\n  c.country\nORDER BY\n  total_shipping_cost DESC\nLIMIT 100;",
+        "execution_accuracy": "correct",
+        "reason": "Results match (5 rows)"
+      }
+    ]
+  }
+}
