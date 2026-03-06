@@ -20,12 +20,21 @@ RULES
 """
 
 BEHAVIORAL_SECTION = """\
-── REFERENCE EXAMPLES ─────────────────────────────────────
-Below are expert-approved question→SQL pairs for reference.  Use them to
-understand SQL patterns, table relationships, and conventions in this database,
-but DO NOT copy them verbatim.  Each new question may require different columns,
-filters, joins, or aggregations — always derive the query from the actual
-question and schema, not from these examples.
+── REFERENCE EXAMPLES (BUSINESS CONVENTIONS) ──────────────
+Below are expert-approved question→SQL pairs that define how this organisation
+interprets business terms.  **Follow these conventions exactly**:
+
+• "revenue" → always computed from order_items (quantity × unit_price), NOT
+  from orders.total_amount.
+• "completed" orders → status IN ('shipped', 'delivered').
+• "net order value" → total_amount − discount (shipping is excluded).
+• "valid" orders → exclude BOTH cancelled AND returned.
+• "active customer" → has at least one valid order.
+• "basket size" → number of items (quantity), not dollar amount.
+• "fulfillment rate" → delivered / (total − cancelled).
+
+Use the examples below to understand patterns and conventions, but adapt the
+SQL to the specific question asked.
 
 {examples}
 """

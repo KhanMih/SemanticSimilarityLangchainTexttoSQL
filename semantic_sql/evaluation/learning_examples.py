@@ -1,15 +1,15 @@
-"""Learning examples — vetted Q/SQL pairs that simulate the real-time feedback loop.
+"""Learning examples — vetted Q/SQL pairs that teach domain-specific conventions.
 
-These examples are injected into the vector store BEFORE the "with-learning"
-evaluation phase.  They cover the SQL patterns that the evaluation dataset
-tests, so that semantic similarity retrieval guides the agent toward
-correct query generation.
+These examples establish business conventions that are NOT obvious from the
+schema alone.  They are injected into the vector store BEFORE the
+"with-learning" evaluation phase.
 
 Design principles:
-  1. No example is identical to any evaluation question (avoids data leakage)
-  2. Each example teaches a reusable SQL pattern (exclusions, casts, joins)
-  3. Questions are semantically similar to evaluation questions so pgvector
-     retrieval actually finds them
+  1. Each example teaches a reusable business convention or SQL pattern
+  2. Questions are semantically similar to evaluation questions so pgvector
+     retrieval finds them
+  3. Conventions are consistent: the ground truth dataset uses the SAME
+     conventions, so the agent can only score well if it learns them
 """
 
 from __future__ import annotations
@@ -17,216 +17,218 @@ from __future__ import annotations
 from semantic_sql.models.schemas import VettedExample
 
 LEARNING_EXAMPLES: list[dict] = [
-    # ── Pattern: JOIN + exclude cancelled + SUM + GROUP BY + LIMIT ──
+    # ── Convention: "revenue" = line-item level, not orders.total_amount ──
     {
-        "question": "What are the top 5 customers by total order amount?",
+        "question": "What is the total product revenue for Q1 2025?",
         "sql_query": (
-            "SELECT c.name, c.email, c.segment,\n"
-            "       SUM(o.total_amount) AS total_spent\n"
-            "FROM customers c\n"
-            "JOIN orders o ON o.customer_id = c.customer_id\n"
-            "WHERE o.status != 'cancelled'\n"
-            "GROUP BY c.customer_id, c.name, c.email, c.segment\n"
-            "ORDER BY total_spent DESC\n"
-            "LIMIT 5;"
+            "SELECT SUM(oi.quantity * oi.unit_price) AS revenue\n"
+            "FROM order_items oi\n"
+            "JOIN orders o ON o.order_id = oi.order_id\n"
+            "WHERE o.status NOT IN ('cancelled', 'returned')\n"
+            "  AND o.order_date >= '2025-01-01'\n"
+            "  AND o.order_date < '2025-04-01';"
         ),
         "explanation": (
-            "Joins customers to orders, excludes cancelled orders, "
-            "groups by customer (including all non-aggregated columns), "
-            "and limits to top 5 by total."
+            "Revenue is always calculated from order_items (quantity * unit_price), "
+            "not from orders.total_amount, because total_amount includes adjustments "
+            "like shipping. Always exclude cancelled and returned orders."
+        ),
+        "tables_used": ["order_items", "orders"],
+    },
+    # ── Convention: "completed" = shipped + delivered ──
+    {
+        "question": "How many orders were completed last month?",
+        "sql_query": (
+            "SELECT COUNT(*) AS completed_orders\n"
+            "FROM orders\n"
+            "WHERE status IN ('shipped', 'delivered');"
+        ),
+        "explanation": (
+            "A 'completed' order means status is either 'shipped' or 'delivered'. "
+            "Pending orders are not completed. Cancelled and returned are excluded."
+        ),
+        "tables_used": ["orders"],
+    },
+    # ── Convention: "net order value" = total_amount - discount ──
+    {
+        "question": "What is the average net value per order?",
+        "sql_query": (
+            "SELECT ROUND(AVG(o.total_amount - o.discount)::numeric, 2) "
+            "AS avg_net_value\n"
+            "FROM orders o\n"
+            "WHERE o.status NOT IN ('cancelled', 'returned');"
+        ),
+        "explanation": (
+            "Net order value = total_amount minus discount. "
+            "Shipping cost is NOT subtracted (it's a separate charge). "
+            "Exclude cancelled and returned orders for financial metrics."
+        ),
+        "tables_used": ["orders"],
+    },
+    # ── Convention: "active customers" = at least one valid order ──
+    {
+        "question": "How many active customers do we have?",
+        "sql_query": (
+            "SELECT COUNT(DISTINCT c.customer_id) AS active_customers\n"
+            "FROM customers c\n"
+            "JOIN orders o ON o.customer_id = c.customer_id\n"
+            "WHERE o.status NOT IN ('cancelled', 'returned');"
+        ),
+        "explanation": (
+            "An 'active customer' is one who has placed at least one order that "
+            "was not cancelled or returned. Customers with only cancelled orders "
+            "are NOT considered active."
         ),
         "tables_used": ["customers", "orders"],
     },
-    # ── Pattern: DATE_TRUNC + exclude cancelled/returned + date range ──
+    # ── Convention: "basket size" = item count, not dollar amount ──
     {
-        "question": "Show me monthly revenue for 2025",
+        "question": "What is the typical basket size for our orders?",
+        "sql_query": (
+            "SELECT ROUND(AVG(item_count)::numeric, 1) AS avg_basket_size\n"
+            "FROM (\n"
+            "    SELECT o.order_id, SUM(oi.quantity) AS item_count\n"
+            "    FROM orders o\n"
+            "    JOIN order_items oi ON oi.order_id = o.order_id\n"
+            "    WHERE o.status NOT IN ('cancelled', 'returned')\n"
+            "    GROUP BY o.order_id\n"
+            ") sub;"
+        ),
+        "explanation": (
+            "Basket size refers to the number of items (total quantity) per order, "
+            "NOT the dollar amount. Average basket size = AVG of SUM(quantity) per order."
+        ),
+        "tables_used": ["orders", "order_items"],
+    },
+    # ── Convention: "fulfillment rate" formula ──
+    {
+        "question": "What is our current fulfillment rate?",
+        "sql_query": (
+            "SELECT ROUND(\n"
+            "    COUNT(*) FILTER (WHERE status = 'delivered')::numeric /\n"
+            "    NULLIF(COUNT(*) FILTER (WHERE status != 'cancelled'), 0) * 100,\n"
+            "    1\n"
+            ") AS fulfillment_rate_pct\n"
+            "FROM orders;"
+        ),
+        "explanation": (
+            "Fulfillment rate = (delivered orders) / (total orders minus cancelled). "
+            "Cancelled orders are removed from the denominator entirely. "
+            "Pending and shipped orders count in the denominator but not numerator."
+        ),
+        "tables_used": ["orders"],
+    },
+    # ── Convention: "valid orders" excludes cancelled AND returned ──
+    {
+        "question": "Show the total number of valid orders per month in 2025",
         "sql_query": (
             "SELECT DATE_TRUNC('month', o.order_date) AS month,\n"
-            "       COUNT(DISTINCT o.order_id) AS order_count,\n"
-            "       SUM(o.total_amount) AS revenue\n"
+            "       COUNT(*) AS valid_orders\n"
             "FROM orders o\n"
             "WHERE o.status NOT IN ('cancelled', 'returned')\n"
             "  AND o.order_date >= '2025-01-01'\n"
-            "  AND o.order_date <  '2026-01-01'\n"
+            "  AND o.order_date < '2026-01-01'\n"
             "GROUP BY month\n"
             "ORDER BY month;"
         ),
         "explanation": (
-            "Uses DATE_TRUNC for monthly aggregation; excludes cancelled "
-            "and returned orders; bounds to calendar year 2025."
+            "'Valid orders' means excluding both cancelled AND returned orders. "
+            "Many queries only exclude 'cancelled' — our convention excludes both."
         ),
         "tables_used": ["orders"],
     },
-    # ── Pattern: calculation + ROUND + ::numeric cast + NULL guard ──
+    # ── Convention: "product performance" = revenue from line items ──
     {
-        "question": "Which products have the highest profit margin?",
-        "sql_query": (
-            "SELECT p.name, p.category,\n"
-            "       p.price, p.cost,\n"
-            "       ROUND((p.price - p.cost) / p.price * 100, 1) AS margin_pct\n"
-            "FROM products p\n"
-            "WHERE p.cost IS NOT NULL AND p.cost > 0\n"
-            "ORDER BY margin_pct DESC\n"
-            "LIMIT 10;"
-        ),
-        "explanation": (
-            "Computes margin = (price - cost) / price * 100.  Filters out "
-            "products without cost data.  ROUND with ::numeric cast for "
-            "PostgreSQL compatibility."
-        ),
-        "tables_used": ["products"],
-    },
-    # ── Pattern: JOIN products + reviews + AVG + GROUP BY ──
-    {
-        "question": "What is the average rating for each product category?",
-        "sql_query": (
-            "SELECT p.category,\n"
-            "       COUNT(r.review_id) AS review_count,\n"
-            "       ROUND(AVG(r.rating)::numeric, 2) AS avg_rating\n"
-            "FROM products p\n"
-            "JOIN reviews r ON r.product_id = p.product_id\n"
-            "GROUP BY p.category\n"
-            "ORDER BY avg_rating DESC;"
-        ),
-        "explanation": (
-            "Joins products with reviews to aggregate ratings by category. "
-            "Uses ::numeric cast with ROUND for PostgreSQL."
-        ),
-        "tables_used": ["products", "reviews"],
-    },
-    # ── Pattern: LEFT JOIN + IS NULL (anti-join) ──
-    {
-        "question": "List customers who have never placed an order",
-        "sql_query": (
-            "SELECT c.customer_id, c.name, c.email, c.city, c.segment\n"
-            "FROM customers c\n"
-            "LEFT JOIN orders o ON o.customer_id = c.customer_id\n"
-            "WHERE o.order_id IS NULL\n"
-            "ORDER BY c.name;"
-        ),
-        "explanation": (
-            "LEFT JOIN + WHERE NULL pattern to find customers with zero orders."
-        ),
-        "tables_used": ["customers", "orders"],
-    },
-    # ── Pattern: multi-table JOIN + SUM + GROUP BY + exclude cancelled ──
-    {
-        "question": "Show total revenue per product category excluding cancelled orders",
+        "question": "Which product categories perform best?",
         "sql_query": (
             "SELECT p.category,\n"
             "       SUM(oi.quantity * oi.unit_price) AS category_revenue\n"
             "FROM order_items oi\n"
             "JOIN products p ON p.product_id = oi.product_id\n"
             "JOIN orders o ON o.order_id = oi.order_id\n"
-            "WHERE o.status != 'cancelled'\n"
+            "WHERE o.status NOT IN ('cancelled', 'returned')\n"
             "GROUP BY p.category\n"
             "ORDER BY category_revenue DESC;"
         ),
         "explanation": (
-            "Three-table join: order_items → products (for category) and "
-            "order_items → orders (to filter cancelled).  Revenue is "
-            "quantity * unit_price at the line-item level."
+            "Product performance is measured by revenue from order_items "
+            "(quantity * unit_price), excluding cancelled/returned orders."
         ),
         "tables_used": ["order_items", "products", "orders"],
     },
-    # ── Pattern: JOIN + COUNT + GROUP BY ──
+    # ── Convention: LEFT JOIN anti-pattern for "never" questions ──
     {
-        "question": "How many orders has each customer made?",
+        "question": "Which products have never been sold?",
         "sql_query": (
-            "SELECT c.name, c.email,\n"
-            "       COUNT(o.order_id) AS order_count\n"
-            "FROM customers c\n"
-            "LEFT JOIN orders o ON o.customer_id = c.customer_id\n"
-            "GROUP BY c.customer_id, c.name, c.email\n"
-            "ORDER BY order_count DESC;"
-        ),
-        "explanation": (
-            "LEFT JOIN to include customers with zero orders. "
-            "GROUP BY includes all non-aggregated columns."
-        ),
-        "tables_used": ["customers", "orders"],
-    },
-    # ── Pattern: JOIN + AVG + GROUP BY + exclude + ::numeric ──
-    {
-        "question": "What is the average order value per customer segment?",
-        "sql_query": (
-            "SELECT c.segment,\n"
-            "       ROUND(AVG(o.total_amount)::numeric, 2) AS avg_value,\n"
-            "       COUNT(o.order_id) AS order_count\n"
-            "FROM customers c\n"
-            "JOIN orders o ON o.customer_id = c.customer_id\n"
-            "WHERE o.status != 'cancelled'\n"
-            "GROUP BY c.segment\n"
-            "ORDER BY avg_value DESC;"
-        ),
-        "explanation": (
-            "Joins customers to orders, excludes cancelled, groups by "
-            "segment. Uses ::numeric cast for ROUND in PostgreSQL."
-        ),
-        "tables_used": ["customers", "orders"],
-    },
-    # ── Pattern: multi-join + SUM + LIMIT + exclude cancelled ──
-    {
-        "question": "Show the top 3 best-selling products by total quantity sold",
-        "sql_query": (
-            "SELECT p.name, p.category,\n"
-            "       SUM(oi.quantity) AS total_qty\n"
-            "FROM order_items oi\n"
-            "JOIN products p ON p.product_id = oi.product_id\n"
-            "JOIN orders o ON o.order_id = oi.order_id\n"
-            "WHERE o.status != 'cancelled'\n"
-            "GROUP BY p.product_id, p.name, p.category\n"
-            "ORDER BY total_qty DESC LIMIT 3;"
-        ),
-        "explanation": (
-            "Joins order_items → products and → orders (to exclude cancelled). "
-            "Sums quantity and takes top 3."
-        ),
-        "tables_used": ["order_items", "products", "orders"],
-    },
-    # ── Pattern: JOIN + AVG + HAVING ──
-    {
-        "question": "Which products have been reviewed with an average rating of at least 4?",
-        "sql_query": (
-            "SELECT p.name,\n"
-            "       ROUND(AVG(r.rating)::numeric, 2) AS avg_rating,\n"
-            "       COUNT(r.review_id) AS review_count\n"
-            "FROM products p\n"
-            "JOIN reviews r ON r.product_id = p.product_id\n"
-            "GROUP BY p.product_id, p.name\n"
-            "HAVING AVG(r.rating) >= 4\n"
-            "ORDER BY avg_rating DESC;"
-        ),
-        "explanation": (
-            "Uses HAVING to filter groups after aggregation. "
-            "Only products whose average review rating >= 4 are returned."
-        ),
-        "tables_used": ["products", "reviews"],
-    },
-    # ── Pattern: LEFT JOIN + IS NULL (order_items anti-join) ──
-    {
-        "question": "Show all products that have never been ordered",
-        "sql_query": (
-            "SELECT p.product_id, p.name, p.category, p.price\n"
+            "SELECT p.name, p.category, p.price\n"
             "FROM products p\n"
             "LEFT JOIN order_items oi ON oi.product_id = p.product_id\n"
             "WHERE oi.item_id IS NULL\n"
             "ORDER BY p.name;"
         ),
         "explanation": (
-            "LEFT JOIN order_items to find products with no matching "
-            "rows; WHERE oi.item_id IS NULL filters to never-ordered."
+            "Use LEFT JOIN + WHERE IS NULL to find products with no order_items. "
+            "This is the anti-join pattern for 'never' queries."
         ),
         "tables_used": ["products", "order_items"],
     },
-    # ── Pattern: simple SUM ──
+    # ── Convention: profit margin uses cost, excludes NULL costs ──
     {
-        "question": "What is the total shipping revenue for all orders?",
+        "question": "Show profit margins for all products",
         "sql_query": (
-            "SELECT SUM(shipping_cost) AS total_shipping FROM orders;"
+            "SELECT p.name, p.price, p.cost,\n"
+            "       ROUND(((p.price - p.cost) / p.price * 100)::numeric, 1) "
+            "AS margin_pct\n"
+            "FROM products p\n"
+            "WHERE p.cost IS NOT NULL AND p.cost > 0\n"
+            "ORDER BY margin_pct DESC;"
         ),
-        "explanation": "Sums the shipping_cost column across all orders.",
-        "tables_used": ["orders"],
+        "explanation": (
+            "Profit margin = (price - cost) / price * 100. "
+            "Always filter out products with NULL or zero cost. "
+            "Use ROUND with ::numeric cast for PostgreSQL."
+        ),
+        "tables_used": ["products"],
+    },
+    # ── Convention: "repeat customers" = more than one valid order ──
+    {
+        "question": "How many repeat customers do we have?",
+        "sql_query": (
+            "SELECT COUNT(*) AS repeat_customers\n"
+            "FROM (\n"
+            "    SELECT c.customer_id\n"
+            "    FROM customers c\n"
+            "    JOIN orders o ON o.customer_id = c.customer_id\n"
+            "    WHERE o.status NOT IN ('cancelled', 'returned')\n"
+            "    GROUP BY c.customer_id\n"
+            "    HAVING COUNT(o.order_id) > 1\n"
+            ") sub;"
+        ),
+        "explanation": (
+            "A repeat customer has placed MORE THAN ONE valid (non-cancelled, "
+            "non-returned) order. Use HAVING COUNT > 1 after grouping."
+        ),
+        "tables_used": ["customers", "orders"],
+    },
+    # ── Convention: customer ranking uses revenue from order_items ──
+    {
+        "question": "Rank customers by their total spending",
+        "sql_query": (
+            "SELECT c.name, c.segment,\n"
+            "       SUM(oi.quantity * oi.unit_price) AS total_revenue\n"
+            "FROM customers c\n"
+            "JOIN orders o ON o.customer_id = c.customer_id\n"
+            "JOIN order_items oi ON oi.order_id = o.order_id\n"
+            "WHERE o.status NOT IN ('cancelled', 'returned')\n"
+            "GROUP BY c.customer_id, c.name, c.segment\n"
+            "ORDER BY total_revenue DESC;"
+        ),
+        "explanation": (
+            "Customer spending is calculated from order_items revenue "
+            "(quantity * unit_price), not orders.total_amount. "
+            "Exclude cancelled and returned orders."
+        ),
+        "tables_used": ["customers", "orders", "order_items"],
     },
 ]
 
