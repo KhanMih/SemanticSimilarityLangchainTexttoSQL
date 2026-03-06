@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from langchain_google_genai import ChatGoogleGenerativeAI
 from rich.console import Console
 from rich.table import Table
 from sqlalchemy import text
@@ -31,6 +32,7 @@ from semantic_sql.benchmark.strategies import (
     DynamicFewShotStrategy,
     ZeroShotStrategy,
 )
+from semantic_sql.config import settings
 from semantic_sql.db.connection import get_engine
 from semantic_sql.db.schema_inspector import SchemaInspector
 from semantic_sql.evaluation.ground_truth import EVALUATION_QUESTIONS
@@ -137,10 +139,6 @@ def _results_match(gold: list[tuple], predicted: list[tuple]) -> bool:
     gold_cols = len(gold_norm[0]) if gold_norm else 0
     pred_cols = len(pred_norm[0]) if pred_norm else 0
 
-    # If predicted has MORE columns than gold, check if the gold values
-    # appear as a subset of each predicted row.  This handles the common
-    # case where the LLM selects extra columns (e.g. product_id) that
-    # the gold SQL doesn't include.
     if pred_cols > gold_cols and gold_cols > 0:
         from itertools import combinations
 
@@ -151,7 +149,6 @@ def _results_match(gold: list[tuple], predicted: list[tuple]) -> bool:
             if projected == gold_norm:
                 return True
 
-    # If gold has MORE columns, try the reverse
     if gold_cols > pred_cols and pred_cols > 0:
         from itertools import combinations
 
@@ -179,6 +176,43 @@ def _safe_execute(engine: Engine, sql: str, timeout: int = 30) -> tuple[bool, li
 
 
 # ---------------------------------------------------------------------------
+# LLM-based answer comparison (for result-set mismatches)
+# ---------------------------------------------------------------------------
+
+_ANSWER_SYSTEM = (
+    "You are a data analyst. Given a question and SQL query results, provide a "
+    "clear, concise natural-language answer. Include specific numbers and values."
+)
+
+_JUDGE_SYSTEM = (
+    "You are an impartial judge evaluating two data analysis answers to the same "
+    "question. Determine whether both answers convey the SAME factual information.\n\n"
+    "Rules:\n"
+    "- Minor differences in wording or formatting are OK\n"
+    "- Rounding differences are OK (e.g., '$599.99' vs '$599.9917')\n"
+    "- Extra detail in one answer is OK as long as the core facts match\n"
+    "- The answers must agree on the KEY facts: same entities, same quantities "
+    "(within rounding), same rankings\n\n"
+    "Respond with EXACTLY one line:\n"
+    "EQUIVALENT: <brief reason>\n"
+    "or\n"
+    "DIFFERENT: <brief reason>"
+)
+
+
+def _format_results_preview(rows: list[tuple] | None) -> str:
+    if rows is None:
+        return "Query failed to execute."
+    if not rows:
+        return "Query returned no results."
+    lines = [str(row) for row in rows[:25]]
+    out = "\n".join(lines)
+    if len(rows) > 25:
+        out += f"\n... and {len(rows) - 25} more rows"
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Per-question evaluation result
 # ---------------------------------------------------------------------------
 
@@ -192,6 +226,8 @@ class QuestionResult:
     execution_accuracy: str  # "correct" | "incorrect"
     reason: str
     valid_sql: bool
+    gold_answer: str = ""
+    predicted_answer: str = ""
     error: str | None = None
 
 
@@ -252,7 +288,7 @@ class EvaluationReport:
 
     def to_dict(self) -> dict:
         return {
-            "ragas_evaluation": True,
+            "ragas_evaluation": RAGAS_AVAILABLE,
             "elapsed_seconds": round(self.elapsed_seconds, 1),
             "summary": {
                 "baseline_accuracy": round(self.baseline.accuracy, 4),
@@ -273,6 +309,8 @@ class EvaluationReport:
                         "gold_sql": r.gold_sql,
                         "predicted_sql": r.predicted_sql,
                         "execution_accuracy": r.execution_accuracy,
+                        "gold_answer": r.gold_answer,
+                        "predicted_answer": r.predicted_answer,
                         "reason": r.reason,
                     }
                     for r in self.baseline.results
@@ -291,6 +329,8 @@ class EvaluationReport:
                         "gold_sql": r.gold_sql,
                         "predicted_sql": r.predicted_sql,
                         "execution_accuracy": r.execution_accuracy,
+                        "gold_answer": r.gold_answer,
+                        "predicted_answer": r.predicted_answer,
                         "reason": r.reason,
                     }
                     for r in self.with_learning.results
@@ -323,6 +363,10 @@ class RAGASEvalRunner:
     Phase 2 — With learning (dynamic few-shot):
         Vetted learning examples are loaded into a separate pgvector collection.
         The agent retrieves the most similar examples for each question.
+
+    Evaluation compares the final LLM-generated answer (not just raw SQL
+    result sets), so queries that produce equivalent answers (e.g. with/without
+    rounding) are correctly marked as matching.
     """
 
     def __init__(
@@ -335,6 +379,11 @@ class RAGASEvalRunner:
         self.timeout = timeout
         self.limit = limit
         self.inspector = SchemaInspector(self.engine)
+        self.llm = ChatGoogleGenerativeAI(
+            model=settings.default_llm_model,
+            google_api_key=settings.google_api_key,
+            temperature=0,
+        )
 
     def run(self, output_file: str | None = None) -> EvaluationReport:
         """Execute the full two-phase evaluation."""
@@ -394,6 +443,58 @@ class RAGASEvalRunner:
         return report
 
     # ------------------------------------------------------------------
+    # LLM answer generation & judging
+    # ------------------------------------------------------------------
+
+    def _generate_answer(
+        self, question: str, sql: str, rows: list[tuple] | None, success: bool,
+    ) -> str:
+        """Generate a natural-language answer from SQL results."""
+        if not success:
+            return "The query failed to execute."
+        if rows is not None and not rows:
+            return "The query returned no results."
+
+        results_text = _format_results_preview(rows)
+        user_msg = (
+            f"Question: {question}\n\n"
+            f"SQL query:\n{sql}\n\n"
+            f"Query results ({len(rows or [])} rows):\n{results_text}\n\n"
+            f"Provide a clear, concise answer to the question based on these results."
+        )
+        try:
+            resp = self.llm.invoke([
+                {"role": "system", "content": _ANSWER_SYSTEM},
+                {"role": "user", "content": user_msg},
+            ])
+            return resp.content.strip()
+        except Exception as exc:
+            logger.warning("Answer generation failed: %s", exc)
+            return f"[Answer generation failed: {exc}]"
+
+    def _judge_answers(
+        self, question: str, gold_answer: str, pred_answer: str,
+    ) -> tuple[bool, str]:
+        """Use LLM as judge to determine if two answers are equivalent."""
+        user_msg = (
+            f"Question: {question}\n\n"
+            f"Reference answer:\n{gold_answer}\n\n"
+            f"Predicted answer:\n{pred_answer}\n\n"
+            f"Are these answers equivalent?"
+        )
+        try:
+            resp = self.llm.invoke([
+                {"role": "system", "content": _JUDGE_SYSTEM},
+                {"role": "user", "content": user_msg},
+            ])
+            verdict = resp.content.strip()
+            is_equivalent = verdict.upper().startswith("EQUIVALENT")
+            return is_equivalent, verdict
+        except Exception as exc:
+            logger.warning("Judge call failed: %s", exc)
+            return False, f"Judge failed: {exc}"
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
@@ -424,6 +525,7 @@ class RAGASEvalRunner:
             gold_success, gold_result = _safe_execute(self.engine, q["gold_sql"], self.timeout)
             pred_success, pred_result = _safe_execute(self.engine, predicted_sql, self.timeout)
 
+            # ── Step 1: Check raw result sets (fast path) ──
             if RAGAS_AVAILABLE:
                 score = execution_accuracy.score(
                     gold_result=gold_result,
@@ -431,22 +533,51 @@ class RAGASEvalRunner:
                     gold_success=gold_success,
                     pred_success=pred_success,
                 )
-                acc_value = score.value
+                raw_match = score.value == "correct"
                 acc_reason = score.reason
             else:
                 if not gold_success:
-                    acc_value, acc_reason = "incorrect", "Gold SQL failed"
+                    raw_match = False
+                    acc_reason = "Gold SQL failed"
                 elif not pred_success:
-                    acc_value, acc_reason = "incorrect", "Predicted SQL failed"
+                    raw_match = False
+                    acc_reason = "Predicted SQL failed"
                 elif _results_match(gold_result or [], pred_result or []):
-                    acc_value = "correct"
+                    raw_match = True
                     acc_reason = f"Results match ({len(gold_result or [])} rows)"
                 else:
-                    acc_value = "incorrect"
+                    raw_match = False
                     acc_reason = (
                         f"Results differ: gold {len(gold_result or [])} rows, "
                         f"pred {len(pred_result or [])} rows"
                     )
+
+            # ── Step 2: If results differ, compare final LLM answers ──
+            gold_answer = ""
+            pred_answer = ""
+
+            if raw_match:
+                acc_value = "correct"
+            elif not pred_success or not gold_success:
+                acc_value = "incorrect"
+            else:
+                # Both SQLs executed but results differ — evaluate the
+                # final answer instead (the senior's key requirement).
+                gold_answer = self._generate_answer(
+                    q["question"], q["gold_sql"], gold_result, gold_success,
+                )
+                pred_answer = self._generate_answer(
+                    q["question"], predicted_sql, pred_result, pred_success,
+                )
+                is_equiv, verdict = self._judge_answers(
+                    q["question"], gold_answer, pred_answer,
+                )
+                if is_equiv:
+                    acc_value = "correct"
+                    acc_reason = f"Answers equivalent: {verdict}"
+                else:
+                    acc_value = "incorrect"
+                    acc_reason = f"Answers differ: {verdict}"
 
             qr = QuestionResult(
                 question_id=i,
@@ -457,6 +588,8 @@ class RAGASEvalRunner:
                 execution_accuracy=acc_value,
                 reason=acc_reason,
                 valid_sql=pred_success,
+                gold_answer=gold_answer,
+                predicted_answer=pred_answer,
                 error=None if pred_success else "SQL execution failed",
             )
             phase.results.append(qr)
